@@ -7,15 +7,11 @@ namespace BuilderConsumer
     {
         static void Main(string[] args)
         {
-            var email = new FluentBuilder.EmailDtoBuilder()
-                .WithValue("x@x.nl")
-                .Build();
-
             var user = new FluentBuilder.UserDtoBuilder()
                 .WithAge(99)
                 .WithFirstName("Stef")
                 .WithLastName("Heyenrath")
-                .WithPrimaryEmail(email)
+                .WithPrimaryEmail(builder => builder.WithValue("x@x.nl"))
                 .Build();
 
             Console.WriteLine($"{user.FirstName} {user.LastName} {user.PrimaryEmail.Value}");
