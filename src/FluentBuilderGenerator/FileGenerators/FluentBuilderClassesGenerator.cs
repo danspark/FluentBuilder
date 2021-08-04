@@ -1,5 +1,4 @@
 ﻿// This source code is based on https://justsimplycode.com/2020/12/06/auto-generate-builders-using-source-generator-in-net-5
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -22,17 +21,18 @@ namespace FluentBuilderGenerator.FileGenerators
 
         public IEnumerable<Data> GenerateFiles()
         {
-            foreach (var classSymbol in GetClassSymbols())
+            var classSymbols = GetClassSymbols();
+            foreach (var classSymbol in classSymbols)
             {
                 yield return new Data
                 {
                     FileName = $"{classSymbol.Name}_Builder.cs",
-                    Text = CreateBuilderCode(classSymbol)
+                    Text = CreateBuilderCode(classSymbol, classSymbols)
                 };
             }
         }
 
-        private string CreateBuilderCode(INamedTypeSymbol classSymbol) => $@"using System;
+        private string CreateBuilderCode(INamedTypeSymbol classSymbol, ICollection<INamedTypeSymbol> typesWithBuilders) => $@"using System;
 using FluentBuilder;
 using {classSymbol.ContainingNamespace};
 
@@ -40,12 +40,12 @@ namespace FluentBuilder
 {{
     public partial class {classSymbol.Name}Builder : Builder<{classSymbol.Name}>
     {{
-{GenerateWithPropertyCode(classSymbol)}
+{GenerateWithPropertyCode(classSymbol, typesWithBuilders)}
 {GenerateBuildsCode(classSymbol)}
     }}
 }}";
 
-        private static string GenerateWithPropertyCode(INamedTypeSymbol classSymbol)
+        private string GenerateWithPropertyCode(INamedTypeSymbol classSymbol, ICollection<INamedTypeSymbol> typesWithBuilders)
         {
             var properties = GetProperties(classSymbol);
             var output = new StringBuilder();
@@ -65,6 +65,24 @@ namespace FluentBuilder
         }}
 
         public {classSymbol.Name}Builder Without{property.Name}() => With{property.Name}(() => default({property.Type}));");
+
+                if (typesWithBuilders.Contains(property.Type, SymbolEqualityComparer.Default))
+                {
+                    output.Append($@"
+        public {classSymbol.Name}Builder With{property.Name}(Action<FluentBuilder.{property.Type.Name}Builder> action) => With{property.Name}(() =>
+        {{
+            var builder = new FluentBuilder.{property.Type.Name}Builder();
+
+            action(builder);
+
+            return builder.Build();
+        }});
+
+        public {classSymbol.Name}Builder With{property.Name}Builder(FluentBuilder.{property.Type.Name}Builder builder) => With{property.Name}(() =>
+        {{
+            return builder.Build();
+        }});");
+                }
 
             }
 
